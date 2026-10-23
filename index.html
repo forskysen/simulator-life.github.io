@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Симулятор жизни — V1.1.1.1</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="logo">🏙️ Симулятор жизни<span class="ver">V1.1.1.1</span></div>
+    <div class="profile">
+      <div class="who"><b id="pname">Игрок</b><span class="money" id="pbal">0 ₽</span></div>
+      <button class="gear" data-t="Настройки" aria-label="Настройки">⚙️</button><div class="avatar" aria-hidden="true">И</div>
+    </div>
+  </div>
+  <nav id="nav" aria-label="Разделы"></nav>
+</header>
+<main>
+  <section class="stats" aria-label="Показатели">
+    <div class="stat"><span class="k">Доход/день</span><b class="v money" id="pinc">0 ₽</b></div>
+    <div class="stat"><span class="k">Расход/день</span><b class="v" id="pexp">0 ₽</b></div>
+    <div class="stat"><span class="k">Уровень</span><b class="v" id="plvl"></b></div>
+    <div class="stat"><span class="k">Настроение</span><b class="v" id="pmood"></b><div class="meter"><i id="pmbar"></i></div></div>
+  </section>
+  <section id="view"></section>
+  
+</main>
+<div class="dock">
+  <div class="dockin">
+    <div class="log" id="log" aria-live="polite"></div>
+    <div class="dayrow">
+      <div class="daybox"><span>ДЕНЬ</span><strong id="day">1</strong></div>
+      <div class="balbox"><span>БАЛАНС</span><b class="money" id="pbal2">0 ₽</b></div>
+      <button class="next" id="next">Следующий день ▶</button>
+    </div>
+  </div>
+</div>
+<div id="toasts" aria-live="polite"></div>
+<script src="js/core/utils.js"></script>
+<script src="js/core/state.js"></script>
+<script src="js/features/work.js"></script>
+<script src="js/features/housing.js"></script>
+<script src="js/features/events.js"></script>
+<script src="js/features/rest.js"></script>
+<script src="js/features/medicine.js"></script>
+<script src="js/features/bank.js"></script>
+<script src="js/features/farm.js"></script>
+<script src="js/features/business.js"></script>
+<script src="js/features/agency.js"></script>
+<script src="js/features/tech.js"></script>
+<script src="js/features/relations.js"></script>
+<script src="js/features/market.js"></script>
+<script src="js/features/realestate.js"></script>
+<script src="js/features/cars.js"></script>
+<script src="js/features/taxes.js"></script>
+<script src="js/features/stats.js"></script>
+<script src="js/features/settings.js"></script>
+<script src="js/ui/render.js"></script>
+<script src="js/game/input.js"></script>
+<script src="js/game/day.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
