@@ -126,7 +126,8 @@ function payTax(k) {
   t.a = 0;
   t.d = 0;
   toast("🧾 " + BILL_NAMES[k], "Оплачено " + formatMoney(a), "good");
-  if (k === "elec" && state.farm.gpus.length) toast("💡 Свет включён", "Ферма снова работает.", "good");
+  if (k === "elec" && state.farm.gpus.length)
+    toast("💡 Свет включён", "Ферма снова работает.", "good");
   render();
 }
 
@@ -154,8 +155,9 @@ function taxDay() {
       if (t.d === 7 && k === "elec" && state.farm.gpus.length)
         toast("🔌 Отключение света", "Электричество не оплачено 7 дней: ферма остановлена", "bad");
       if (t.d === 7 && k === "sal") {
-        var q = state.astro;
+        var q = state.astro + (state.farm.worker || 0);
         state.astro = 0;
+        state.farm.worker = 0;
         state.B.forEach(function (s) {
           q += s.emp;
           s.emp = 0;
@@ -174,9 +176,14 @@ function taxDay() {
         moveTo(0);
         toast("🏚️ Вас выселили", "Аренда (" + hn + ") не оплачена 7 дней", "bad");
       }
-      if (t.d === 15) toast("⚠️ Счёт не оплачен", BILL_NAMES[k] + ": пени растут на 0,5% в день", "bad");
+      if (t.d === 15)
+        toast("⚠️ Счёт не оплачен", BILL_NAMES[k] + ": пени растут на 0,5% в день", "bad");
       if (t.d === 25)
-        toast("🚨 Скоро придут приставы", "Через 5 дней: " + BILL_NAMES[k] + " всё ещё не оплачен", "bad");
+        toast(
+          "🚨 Скоро придут приставы",
+          "Через 5 дней: " + BILL_NAMES[k] + " всё ещё не оплачен",
+          "bad",
+        );
     }
   }
   o += autoPay();
@@ -289,7 +296,10 @@ function monthEnd() {
   );
   o += autoPay();
   return (
-    " Конец месяца: начислены счета и налоги" + (state.ap.own ? "" : " (оплатить в «Банке»)") + ". " + o
+    " Конец месяца: начислены счета и налоги" +
+    (state.ap.own ? "" : " (оплатить в «Банке»)") +
+    ". " +
+    o
   );
 }
 
@@ -302,7 +312,7 @@ var AUTOPAY_ORDER = ["elec", "sal", "rent", "opx", "prop", "veh", "job", "biz", 
   APCOST = 300000;
 
 function estimatedSalaries() {
-  var s = state.astro * 150000;
+  var s = state.astro * 150000 + (state.farm.worker ? FARM_WORKER_SALARY : 0);
   state.B.forEach(function (b, i) {
     if (b.own) s += b.emp * EMPLOYEE_SALARY[i] * (b.u2[2] ? 0.75 : 1);
   });

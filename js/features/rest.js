@@ -41,7 +41,11 @@ function startRest() {
   var c = Math.round(150000 * state.infl);
   if (state.rest > 0) return;
   if (state.day - state.restDay < 365) {
-    toast("Отдых", "Следующий месячный отдых через " + (365 - (state.day - state.restDay)) + " дн.", "bad");
+    toast(
+      "Отдых",
+      "Следующий месячный отдых через " + (365 - (state.day - state.restDay)) + " дн.",
+      "bad",
+    );
     return;
   }
   if (state.bal < c) {

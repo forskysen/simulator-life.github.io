@@ -17,9 +17,10 @@ var state = {
   life: 0,
   mood: 70,
   sick: 0,
-  farm: { racks: 0, gpus: [], lube: 0, cool: 0, off: 0, debt: 0 },
+  farm: { racks: 0, gpus: [], lube: 0, cool: 0, off: 0, debt: 0, worker: 0 },
   dep: 0,
   teeth: 100,
+  implant: 0,
   shield: 0,
   banned: {},
   bs: "home",
@@ -44,15 +45,39 @@ var state = {
   taxPaid: 0,
   apa: 0,
   pain: 0,
+  saveVer: SAVE_VERSION,
+  navLast: {},
+  hist: { days: [], months: [] },
+  histRange: 30,
 };
 
+/** Сохранения версии 1: в HOMES вставлены 2 дома (индексы 3 и 4), остальные покупные сдвинулись на 2. */
+function migrateHomes() {
+  if (state.saveVer >= 2) return;
+  var shift = function (i) {
+    return i >= 3 ? i + 2 : i;
+  };
+  state.house = shift(state.house);
+  var hm = {};
+  for (var k in state.hm) hm[shift(+k)] = state.hm[k];
+  state.hm = hm;
+  state.saveVer = 2;
+}
+
 function fixS() {
-  while (state.B.length < 7) state.B.push({ own: 0, n: 0, up: [0, 0, 0], x: 0 });
+  if (!state.navLast) state.navLast = {};
+  if (!state.hist) state.hist = { days: [], months: [] };
+  if (!state.histRange && state.histRange !== 0) state.histRange = 30;
+  normalizeTab();
+  while (state.B.length < BUSINESSES.length) state.B.push({ own: 0, n: 0, up: [0, 0, 0], x: 0 });
+  while (state.tech.d.length < TECH.length) state.tech.d.push(0);
   state.B.forEach(function (s) {
     if (s.emp === undefined) s.emp = s.n || 0;
     if (!s.u2) s.u2 = [0, 0, 0];
   });
+  if (state.implant === undefined) state.implant = 0;
   if (state.farm.wc === undefined) state.farm.wc = 0;
+  if (state.farm.worker === undefined) state.farm.worker = 0;
   if (!state.eco) state.eco = { ph: 0, left: 90 };
   if (!state.infl) state.infl = 1;
   if (state.rest === undefined) {
@@ -81,11 +106,14 @@ function fixS() {
   }
   state.farm.off = 0;
   if (!state.hm) {
-    var MAP = [0, 1, 2, 3, 5, 6, 8, 9];
+    // совсем старые сохранения: сразу в нумерацию версии 2
+    var MAP = [0, 1, 2, 5, 7, 8, 10, 11];
     state.house = MAP[state.house] !== undefined ? MAP[state.house] : 0;
     state.hm = {};
     if (state.house >= 3) state.hm[state.house] = homePrice(state.house);
+    state.saveVer = SAVE_VERSION;
   }
+  migrateHomes();
   for (var k in state.banned) if (state.banned[k] === true) state.banned[k] = state.day;
 }
 
@@ -107,11 +135,15 @@ function saveCfg() {
 function applyCfg() {
   var r = document.documentElement;
   if (!r || !r.setAttribute) return;
-  if (SETTINGS.theme === "light" || SETTINGS.theme === "dark") r.setAttribute("data-theme", SETTINGS.theme);
+  if (SETTINGS.theme === "light" || SETTINGS.theme === "dark")
+    r.setAttribute("data-theme", SETTINGS.theme);
   else r.removeAttribute("data-theme");
 }
 
 var SAVE_KEY = "lifesim_v01";
+
+/** Версия формата сохранения: 2 = список жилья расширен (индексы домов 3+ сдвинуты на 2). */
+var SAVE_VERSION = 2;
 
 function save() {
   try {
@@ -126,6 +158,7 @@ function load() {
     if (!r) return false;
     var o = JSON.parse(r);
     for (var k in o) state[k] = o[k];
+    state.saveVer = o.saveVer || 1;
     while (state.B.length < 4) state.B.push({ own: 0, n: 0, up: [0, 0, 0], x: 0 });
     if (state.tab === "Налоги") state.tab = "Банк";
     return true;

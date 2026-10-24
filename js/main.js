@@ -3,11 +3,13 @@
  */
 
 document.addEventListener("click", onGameClick);
+document.addEventListener("keydown", onGameKey);
 document.getElementById("next").onclick = nextDay;
 document.getElementById("log").onclick = function () {
   this.classList.toggle("open");
 };
 
+installLedger();
 var loaded = load();
 fixS();
 marketInit();

@@ -17,6 +17,13 @@ var JOBS = [
   ["Водители", 2800, "Перевозки", 15, "Автошкола"],
   ["Программист", 5500, "Разработка", 120, "Курсы программирования"],
   ["Банкир", 6000, "Банк", 150, "Финансовый университет"],
+  // добавлено в 1.1.2 (в конец, чтобы не сдвигать индексы в сохранениях; на экране всё равно по зарплате)
+  ["Курьер", 1500, "Доставка пешком и на самокате", 0, ""],
+  ["Электрик", 3700, "Монтаж и ремонт проводки", 25, "Колледж электриков"],
+  ["Менеджер", 4200, "Продажи и работа с клиентами", 40, "Курсы менеджмента"],
+  ["Врач", 4600, "Поликлиника", 180, "Медицинский университет"],
+  ["Инженер", 4900, "Проектирование и расчёты", 100, "Технический университет"],
+  ["Юрист", 5100, "Договоры и суды", 120, "Юридический факультет"],
 ];
 
 var LIFESTYLES = [
@@ -26,7 +33,7 @@ var LIFESTYLES = [
   ["Люкс", 4000, "Дорогие рестораны, путешествия, личный водитель"],
 ];
 
-var JOB_PRESTIGE = [3, 3, 3, 1, 3, 0, 2, 1, 1, 0, 1, 2, 4, 5];
+var JOB_PRESTIGE = [3, 3, 3, 1, 3, 0, 2, 1, 1, 0, 1, 2, 4, 5, 0, 2, 3, 4, 3, 4];
 
 function livingStandard() {
   return HOME_PRESTIGE[state.house] + state.life;
@@ -80,6 +87,11 @@ var COURSE_PRICE = {
   11: 10000,
   12: 150000,
   13: 250000,
+  15: 14000,
+  16: 30000,
+  17: 220000,
+  18: 95000,
+  19: 120000,
 };
 
 function playerLevel() {
@@ -95,7 +107,22 @@ function playerLevel() {
           : "Роскошный";
 }
 
-var JOB_MIN_HOME = { 0: 1, 1: 1, 2: 1, 4: 1, 6: 1, 11: 1, 12: 3, 13: 6 };
+// профессия -> минимальное жильё (индекс в HOMES): 1 общежитие, 5 однокомнатная, 8 загородный дом
+var JOB_MIN_HOME = {
+  0: 1,
+  1: 1,
+  2: 1,
+  4: 1,
+  6: 1,
+  11: 1,
+  12: 5,
+  13: 8,
+  15: 1,
+  16: 1,
+  17: 5,
+  18: 1,
+  19: 5,
+};
 
 function jobsRequiringHome(l) {
   var r = [];
@@ -106,9 +133,13 @@ function jobsRequiringHome(l) {
 function dailyIncome() {
   return state.job < 0 || state.sick > 0
     ? 0
-    : JOBS[state.job][1] * (1 + relBonus()) * healthIncomeMultiplier() * economyMultiplier() * state.infl * (1 + carBonus());
+    : JOBS[state.job][1] *
+        (1 + relBonus()) *
+        healthIncomeMultiplier() *
+        economyMultiplier() *
+        state.infl *
+        (1 + carBonus());
 }
-
 
 /** Клик по работе: проверяем учёбу, жильё, бан и престиж, потом устраиваемся. */
 function pickJob(k) {
@@ -152,4 +183,109 @@ function setLifestyle(i) {
   state.life = i;
   log("Образ жизни: " + LIFESTYLES[state.life][0] + "." + quitIfBelowStandard());
   render();
+}
+
+/** Индексы профессий от самой низкой зарплаты к самой высокой (индексы в сохранениях не меняются). */
+function jobOrder() {
+  return JOBS.map(function (j, i) {
+    return i;
+  }).sort(function (a, b) {
+    return JOBS[a][1] - JOBS[b][1] || a - b;
+  });
+}
+
+/** Экран «Работа»: список профессий. */
+function workView() {
+  var v = "";
+
+  v =
+    '<h1>Работа</h1><p class="sub">Выберите профессию. Зарплата начисляется каждый день.</p><div class="jobs">';
+  jobOrder().forEach(function (i) {
+    var j = JOBS[i];
+    var need = j[3] && !state.done[i];
+    var nh = JOB_MIN_HOME[i] || 0,
+      noh = state.house < nh,
+      low = prestigeGap(i) >= 3,
+      ban = isFiredFrom(i);
+    var info = !j[3]
+      ? "Обучение не нужно"
+      : need
+        ? "🔒 Нужно: " + j[4] + ", " + j[3] + " дн., " + formatMoney(COURSE_PRICE[i])
+        : "✔ Обучение пройдено";
+    v +=
+      '<button class="job" data-j="' +
+      i +
+      '" aria-pressed="' +
+      (i === state.job) +
+      '"' +
+      (need || noh || low || ban ? ' style="opacity:.6"' : "") +
+      '><span class="n">' +
+      j[0] +
+      '</span><span class="p">' +
+      formatMoney(j[1]) +
+      ' / день</span><span class="t">' +
+      j[2] +
+      '</span><span class="t">' +
+      info +
+      "</span>" +
+      (nh
+        ? '<span class="t">' + (noh ? "🔒" : "✔") + " Жильё: " + HOMES[nh][0] + " или лучше</span>"
+        : "") +
+      (low ? '<span class="t">Слишком низко для вашего уровня жизни</span>' : "") +
+      (ban
+        ? '<span class="t">🚫 Уволены: вернуться можно через ' +
+          (365 - (state.day - state.banned[i])) +
+          " дн.</span>"
+        : "") +
+      "</button>";
+  });
+  v += "</div>";
+  return v;
+}
+
+/** Экран «Образование»: курсы и прогресс обучения. */
+function educationView() {
+  var v = "";
+
+  v =
+    '<h1>Образование</h1><p class="sub">Обучение платное: сначала накопите нужную сумму, она списывается при старте. Учёба идёт по дням. Без него часть профессий недоступна. Учиться можно только по одной программе.</p><div class="jobs">';
+  jobOrder().forEach(function (i) {
+    var j = JOBS[i];
+    if (!j[3]) return;
+    var st;
+    if (state.done[i]) st = '<span class="t">✔ Пройдено</span>';
+    else if (state.study === i)
+      st =
+        '<div class="bar2"><i style="width:' +
+        Math.round((state.prog / j[3]) * 100) +
+        '%"></i></div><span class="t">День ' +
+        state.prog +
+        " из " +
+        j[3] +
+        "</span>";
+    else
+      st =
+        '<span class="t"><button class="learn" data-e="' +
+        i +
+        '"' +
+        (state.study >= 0 || state.bal < COURSE_PRICE[i] ? " disabled" : "") +
+        ">Начать обучение</button></span>" +
+        (state.bal < COURSE_PRICE[i]
+          ? '<span class="t">Не хватает ' + formatMoney(COURSE_PRICE[i] - state.bal) + "</span>"
+          : "");
+    v +=
+      '<div class="job"><span class="n">' +
+      j[4] +
+      '</span><span class="p">' +
+      j[3] +
+      " дн., " +
+      formatMoney(COURSE_PRICE[i]) +
+      '</span><span class="t">Откроет: ' +
+      j[0] +
+      "</span>" +
+      st +
+      "</div>";
+  });
+  v += "</div>";
+  return v;
 }

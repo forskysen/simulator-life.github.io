@@ -26,7 +26,9 @@ function ownCompanyFairPrice() {
 }
 
 function assetInfo(i) {
-  return i < MARKET_ASSETS.length ? { t: MARKET_ASSETS[i][0], n: MARKET_ASSETS[i][1] } : { t: escapeHtml(state.mk.own.t), n: escapeHtml(state.mk.own.n) };
+  return i < MARKET_ASSETS.length
+    ? { t: MARKET_ASSETS[i][0], n: MARKET_ASSETS[i][1] }
+    : { t: escapeHtml(state.mk.own.t), n: escapeHtml(state.mk.own.n) };
 }
 
 function marketNextPrice(i, M) {
@@ -36,8 +38,12 @@ function marketNextPrice(i, M) {
     var a = MARKET_ASSETS[i];
     r = a[3] + a[5] * M + a[4] * gaussianRandom();
     if (Math.random() < 0.012) r += (Math.random() < 0.5 ? -1 : 1) * (0.04 + Math.random() * 0.08);
-  } else r = 0.02 * Math.log(Math.max(0.01, ownCompanyFairPrice()) / p) + 0.035 * gaussianRandom() + M;
-  return Math.max(i === MARKET_ASSETS.length - 1 ? 0.5 : 1, Math.round(p * Math.exp(r) * 100) / 100);
+  } else
+    r = 0.02 * Math.log(Math.max(0.01, ownCompanyFairPrice()) / p) + 0.035 * gaussianRandom() + M;
+  return Math.max(
+    i === MARKET_ASSETS.length - 1 ? 0.5 : 1,
+    Math.round(p * Math.exp(r) * 100) / 100,
+  );
 }
 
 function marketInit() {
@@ -317,7 +323,9 @@ function marketTrade(i, mode) {
     addTax("gain", tax);
     toast(
       "📉 Продажа " + a.t,
-      "Получено " + formatMoney(net) + (tax ? " (налог " + formatMoney(tax) + " к оплате в Банке)" : ""),
+      "Получено " +
+        formatMoney(net) +
+        (tax ? " (налог " + formatMoney(tax) + " к оплате в Банке)" : ""),
       prof >= 0 ? "good" : "bad",
     );
   }

@@ -115,7 +115,109 @@ var BUSINESSES = [
     ],
     "Скандал вокруг кампании",
   ],
+  // --- добавлено в 1.1.2 (индексы 7-11; на экране список сортируется по заработку) ---
+  [
+    "🍽️ Сеть ресторанов",
+    400000,
+    "Кухня, зал, повара. Ровный доход и вкусные налоги.",
+    "Открыть ресторан",
+    250000,
+    3000,
+    30000,
+    10,
+    [
+      ["Кухня премиум-класса", 400000, 0.15, "+15% к доходу"],
+      ["Доставка еды", 600000, 0.2, "+20% к доходу"],
+      ["Шеф-повар со звездой", 900000, 0.25, "+25% к доходу"],
+    ],
+    "Проверка санитарной службы",
+  ],
+  [
+    "🏗️ Строительная компания",
+    6000000,
+    "Бригады, техника, подряды. Нужны строительные курсы (Образование).",
+    "Нанять строительную бригаду",
+    8000000,
+    70000,
+    800000,
+    10,
+    [
+      ["Парк техники", 10000000, 0.15, "+15% к доходу"],
+      ["Собственный бетонный завод", 15000000, 0.2, "+20% к доходу"],
+      ["Госзаказы", 25000000, 0.3, "+30% к доходу"],
+    ],
+    "Авария на стройплощадке",
+  ],
+  [
+    "🏙️ Девелопер жилых комплексов",
+    30000000,
+    "Земля, проекты, продажа квартир. Нужен юридический диплом (Образование).",
+    "Начать строительство ЖК",
+    40000000,
+    300000,
+    3500000,
+    8,
+    [
+      ["Выкуп земли", 50000000, 0.15, "+15% к доходу"],
+      ["Премиальные комплексы", 80000000, 0.2, "+20% к доходу"],
+      ["Городской квартал", 120000000, 0.3, "+30% к доходу"],
+    ],
+    "Иск дольщиков",
+  ],
+  [
+    "⛽ Нефтедобыча",
+    60000000,
+    "Скважины, насосы, трубопроводы. Нужен технический диплом (Образование).",
+    "Пробурить скважину",
+    80000000,
+    600000,
+    7000000,
+    10,
+    [
+      ["Мощные насосы", 100000000, 0.15, "+15% к доходу"],
+      ["Нефтепровод", 150000000, 0.2, "+20% к доходу"],
+      ["Морская платформа", 250000000, 0.4, "+40% к доходу"],
+    ],
+    "Утечка и экологический штраф",
+  ],
+  [
+    "🔌 Электростанция",
+    20000000,
+    "Турбины, подстанции, сети. Нужен диплом электрика (Образование).",
+    "Построить энергоблок",
+    25000000,
+    190000,
+    2000000,
+    10,
+    [
+      ["Новые турбины", 30000000, 0.15, "+15% к доходу"],
+      ["Умная сеть", 50000000, 0.2, "+20% к доходу"],
+      ["Экспорт энергии", 80000000, 0.3, "+30% к доходу"],
+    ],
+    "Авария на подстанции",
+  ],
 ];
+
+/**
+ * Порядок бизнесов на экране: по чистому заработку одной точки в месяц
+ * (доход минус расходы точки минус зарплата сотрудника). У агентства нет точек,
+ * для него взято примерное значение. Индексы в сохранениях при этом не меняются.
+ */
+var AGENCY_SORT_VALUE = 2000000;
+
+function businessSortValue(i) {
+  if (i === 6) return AGENCY_SORT_VALUE;
+  var b = BUSINESSES[i];
+  return b[5] * 30 - b[6] - EMPLOYEE_SALARY[i];
+}
+
+function businessOrder() {
+  return BUSINESSES.map(function (b, i) {
+    return i;
+  }).sort(function (a, c) {
+    return businessSortValue(a) - businessSortValue(c) || a - c;
+  });
+}
 
 function businessIncome(i) {
   var s = state.B[i],
@@ -125,7 +227,15 @@ function businessIncome(i) {
   });
   if (s.u2[0]) m += 0.1;
   var u = i === 6 ? agencyBase() : Math.min(s.n, s.emp) * BUSINESSES[i][5];
-  return u * m * (1 + relBonus()) * techBonus(i) * healthIncomeMultiplier() * economyMultiplier() * restMultiplier();
+  return (
+    u *
+    m *
+    (1 + relBonus()) *
+    techBonus(i) *
+    healthIncomeMultiplier() *
+    economyMultiplier() *
+    restMultiplier()
+  );
 }
 
 function businessDay() {
@@ -172,7 +282,11 @@ function businessAction(id) {
     c = b[1];
   } else if (k === "U") {
     if (s.n >= businessMaxPoints(i)) {
-      toast("Лимит", "Максимум: " + businessMaxPoints(i) + ". Расширьте лимит в улучшениях.", "bad");
+      toast(
+        "Лимит",
+        "Максимум: " + businessMaxPoints(i) + ". Расширьте лимит в улучшениях.",
+        "bad",
+      );
       return;
     }
     c = pointPrice(i);
@@ -237,12 +351,9 @@ function businessAction(id) {
 function businessHub() {
   var v =
     '<h1>Бизнес</h1><p class="sub">Выберите бизнес. Прибыль за месяц облагается налогом 13%.</p><div class="jobs">';
-  v +=
-    '<button class="job" data-bs="m"><span class="n">⛏️ Майнинг-ферма</span><span class="p">' +
-    (state.farm.gpus.length ? formatMoney(farmInc()) + "/день" : "Не запущена") +
-    '</span><span class="t">Стойки, видеокарты, заточка</span></button>';
-  BUSINESSES.forEach(function (b, i) {
-    var s = state.B[i];
+  businessOrder().forEach(function (i) {
+    var b = BUSINESSES[i],
+      s = state.B[i];
     v +=
       '<button class="job" data-bs="' +
       i +
@@ -254,10 +365,6 @@ function businessHub() {
       b[2] +
       "</span></button>";
   });
-  v +=
-    '<button class="job" data-bs="t"><span class="n">🔬 Технологии</span><span class="p">' +
-    state.tech.d.filter(Boolean).length +
-    ' из 5</span><span class="t">Исследования, уникальная технология</span></button>';
   return v + "</div>";
 }
 
@@ -291,9 +398,15 @@ function businessView(i) {
     '</b></div><div class="row"><span>Доход в день</span><b class="money">' +
     formatMoney(businessIncome(i)) +
     '</b></div><div class="row"><span>Расходы в месяц</span><b>' +
-    formatMoney(s.n * b[6] + s.emp * EMPLOYEE_SALARY[i] * (s.u2[2] ? 0.75 : 1) + (i === 3 ? state.astro * 150000 : 0)) +
+    formatMoney(
+      s.n * b[6] +
+        s.emp * EMPLOYEE_SALARY[i] * (s.u2[2] ? 0.75 : 1) +
+        (i === 3 ? state.astro * 150000 : 0),
+    ) +
     "</b></div>" +
-    (i === 3 ? '<div class="row"><span>Космонавты</span><b>' + state.astro + " из 30</b></div>" : "") +
+    (i === 3
+      ? '<div class="row"><span>Космонавты</span><b>' + state.astro + " из 30</b></div>"
+      : "") +
     "</div>";
   v +=
     '<h1 style="margin-top:24px">Расширение</h1><div class="jobs"><button class="job" data-z="U' +
@@ -351,8 +464,11 @@ function totalBusinessIncome() {
   return t;
 }
 
-var EMPLOYEE_SALARY = [25000, 80000, 250000, 600000, 180000, 70000, 150000],
-  BUSINESS_DIPLOMA = { 5: 12 },
+var EMPLOYEE_SALARY = [
+    25000, 80000, 250000, 600000, 180000, 70000, 150000, 25000, 200000, 450000, 800000, 400000,
+  ],
+  // бизнес -> курс (индекс профессии), без диплома лицензию не продают
+  BUSINESS_DIPLOMA = { 5: 12, 8: 7, 9: 19, 10: 18, 11: 15 },
   POINT_PRICE_GROWTH = { 4: 1.35 },
   UNLIMITED_POINTS = { 4: 1 };
 
@@ -402,4 +518,9 @@ function upgradesHtml(i) {
         "</span></button>";
   });
   return v;
+}
+
+/** Экран вкладки «Бизнес»: список бизнесов или один выбранный бизнес. */
+function businessesView() {
+  return state.bs === "home" ? businessHub() : businessView(state.bs);
 }

@@ -4,6 +4,7 @@
 
 function nextDay() {
   if (state.dead) return;
+  ledgerBegin();
   state.day++;
   state.life = autoLifestyle();
   var m = "День " + state.day + ". ";
@@ -65,6 +66,7 @@ function nextDay() {
   if (state.day % 30 === 0) {
     m += monthEnd();
   }
+  ledgerEnd();
   log(m);
   render();
 }

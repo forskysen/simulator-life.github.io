@@ -16,7 +16,16 @@ var PARTNER_REQUESTS = [
   ["Увидела платье, ну пожалуйста 👗", 20000, "Нашла красивое платье, можно? 👗", "платье"],
 ];
 
-var PARTNER_NAMES = ["Алина", "Виктория", "Карина", "Дарья", "Милана", "Эльвира", "Ангелина", "Софья"];
+var PARTNER_NAMES = [
+  "Алина",
+  "Виктория",
+  "Карина",
+  "Дарья",
+  "Милана",
+  "Эльвира",
+  "Ангелина",
+  "Софья",
+];
 
 function relDay() {
   var P = state.rel,
@@ -86,7 +95,11 @@ function relationAction(a) {
       return;
     }
     if (a === "gift" && P.gd !== undefined && state.day - P.gd < 30) {
-      toast("Подарок", "Дарить можно раз в месяц. Через " + (30 - (state.day - P.gd)) + " дн.", "bad");
+      toast(
+        "Подарок",
+        "Дарить можно раз в месяц. Через " + (30 - (state.day - P.gd)) + " дн.",
+        "bad",
+      );
       return;
     }
     if (state.bal < c) {
@@ -129,7 +142,9 @@ function relView() {
     return (
       v +
       '<div class="panel"><p>Вы одиноки. Настроение медленно падает.' +
-      (state.kids ? " Детей: " + state.kids + " (−" + formatMoney(state.kids * childDailyCost()) + "/день)." : "") +
+      (state.kids
+        ? " Детей: " + state.kids + " (−" + formatMoney(state.kids * childDailyCost()) + "/день)."
+        : "") +
       '</p><button class="learn" data-r="meet">Познакомиться: 3 000 ₽</button></div>'
     );
   v +=
@@ -149,7 +164,10 @@ function relView() {
     (P.m
       ? "Расходы на жизнь выше"
       : relBonus()
-        ? "Доход +" + Math.round(relBonus() * 100) + "%" + (partnerCareActive() ? ", болезни реже" : "")
+        ? "Доход +" +
+          Math.round(relBonus() * 100) +
+          "%" +
+          (partnerCareActive() ? ", болезни реже" : "")
         : partnerCareActive()
           ? "Болезни реже"
           : "Нужны чувства от 50–60%") +

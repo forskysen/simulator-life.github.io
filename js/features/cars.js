@@ -10,7 +10,22 @@ var CARS = [
   ["Вектор Купе", 15000000, 0.18],
   ["Аврора Люкс", 35000000, 0.22],
   ["Комета Спорт", 80000000, 0.25],
+  // добавлено в 1.1.2 (в конец, чтобы не сдвигать ключи купленных машин; на экране всё равно по цене)
+  ["Жук Городской", 400000, 0.015],
+  ["Ветер Хэтчбек", 1200000, 0.045],
+  ["Гранит Пикап", 5000000, 0.12],
+  ["Феникс Гран-турисмо", 25000000, 0.2],
+  ["Призрак Гиперкар", 200000000, 0.28],
 ];
+
+/** Индексы машин от самой дешёвой к самой дорогой (ключи в state.cars не меняются). */
+function carOrder() {
+  return CARS.map(function (c, i) {
+    return i;
+  }).sort(function (a, b) {
+    return CARS[a][1] - CARS[b][1] || a - b;
+  });
+}
 
 function carBonus() {
   var b = 0;
@@ -20,9 +35,10 @@ function carBonus() {
 
 function carView() {
   var v =
-    '<h1 style="margin-top:28px">Машины</h1><p class="sub">Машина даёт плюс к зарплате (считается лучшая из ваших). Транспортный налог 0,15% в месяц с каждой. Продажа за 70% цены.</p><div class="jobs">';
-  CARS.forEach(function (c, i) {
-    var own = state.cars[i] !== undefined;
+    '<h1>Машины</h1><p class="sub">Машина даёт плюс к зарплате (считается лучшая из ваших). Транспортный налог 0,15% в месяц с каждой. Продажа за 70% цены.</p><div class="jobs">';
+  carOrder().forEach(function (i) {
+    var c = CARS[i],
+      own = state.cars[i] !== undefined;
     v +=
       '<div class="job"><span class="n">' +
       c[0] +
@@ -35,7 +51,11 @@ function carView() {
       formatMoney(Math.round(c[1] * 0.0015)) +
       " / мес</span><div>" +
       (own
-        ? '<button class="learn" data-car="s' + i + '">Продать: ' + formatMoneyShort(c[1] * 0.7) + "</button>"
+        ? '<button class="learn" data-car="s' +
+          i +
+          '">Продать: ' +
+          formatMoneyShort(c[1] * 0.7) +
+          "</button>"
         : '<button class="learn" data-car="b' + i + '">Купить</button>') +
       "</div></div>";
   });

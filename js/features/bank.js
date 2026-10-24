@@ -37,7 +37,11 @@ function bankAction(k) {
       return;
     }
     if (a > room) {
-      toast("Банк", "Лимит вклада " + formatMoney(DEPOSIT_LIMIT) + ". Можно доложить ещё " + formatMoney(room), "bad");
+      toast(
+        "Банк",
+        "Лимит вклада " + formatMoney(DEPOSIT_LIMIT) + ". Можно доложить ещё " + formatMoney(room),
+        "bad",
+      );
       return;
     }
     state.bal -= a;
@@ -126,6 +130,7 @@ function bankUpgradeAction(k) {
   var r = state.bu.r,
     l = state.bu.l,
     c = k === "ur" ? DEPOSIT_RATE_UPGRADE_PRICES[r] : DEPOSIT_LIMIT_UPGRADE_PRICES[l];
+  if (c === undefined) return; // все улучшения этого вида уже куплены
   if (state.bal < c) {
     toast("Не хватает денег", "Нужно " + formatMoney(c), "bad");
     return;

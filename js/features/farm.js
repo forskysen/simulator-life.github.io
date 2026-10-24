@@ -14,7 +14,9 @@ var RACK_PRICE = 25000,
   RACK_SLOTS = 4,
   GPU_UPGRADE_CHANCE = [95, 90, 80, 70, 60, 50, 40, 30, 20],
   LUBE_PRICE = 300,
-  COOLANT_PRICE = 400;
+  LUBE_PACK = 10, // единиц смазки в одной покупке
+  COOLANT_PRICE = 400,
+  FARM_WORKER_SALARY = 30000; // зарплата смазчика в месяц
 
 function gpuInc(g) {
   return GPU_TYPES[g.t][2] * (1 + (g.l - 1) * 0.35);
@@ -49,6 +51,7 @@ function farmDay() {
     n = F.gpus.length;
   if (!n) return "";
   if (blackout()) return "Свет на ферме отключён за неуплату. ";
+  var note = autoLube();
   var inc = farmInc();
   F.lube = Math.max(0, F.lube - n * 0.05);
   F.cool = Math.max(0, F.cool - airCooledGpuCount() * 0.1);
@@ -63,7 +66,7 @@ function farmDay() {
     toast("🔥 Ферма сгорела", "Все стойки и видеокарты уничтожены.", "bad");
     return "Ферма сгорела дотла. ";
   }
-  return "Майнинг: +" + formatMoney(inc) + ". ";
+  return "Майнинг: +" + formatMoney(inc) + ". " + note;
 }
 
 function farmMonth() {
@@ -72,7 +75,45 @@ function farmMonth() {
   return "";
 }
 
+/** Нанять или уволить смазчика (нужна хотя бы одна стойка). */
+function farmToggleWorker() {
+  var F = state.farm;
+  if (!F.worker && !F.racks) {
+    toast("Нет фермы", "Сначала купите стойку.", "bad");
+    return;
+  }
+  F.worker = F.worker ? 0 : 1;
+  if (F.worker)
+    toast(
+      "🧑‍🔧 Смазчик нанят",
+      "Зарплата " + formatMoney(FARM_WORKER_SALARY) + " в месяц, смазку докупает сам.",
+      "good",
+    );
+  else toast("Смазчик уволен", "Смазку снова нужно докупать вручную.", "");
+  render();
+}
+
+/** Смазчик докупает смазку за счёт игрока, когда её остаётся меньше чем на 2 дня. */
+function autoLube() {
+  var F = state.farm,
+    need = F.gpus.length * 0.05 * 2,
+    cost = LUBE_PRICE * LUBE_PACK,
+    spent = 0;
+  if (!F.worker) return "";
+  while (F.lube < need && state.bal >= cost) {
+    state.bal -= cost;
+    F.lube += LUBE_PACK;
+    spent += cost;
+  }
+  if (F.lube < need) toast("🧴 Нет денег на смазку", "Смазчик не смог её докупить.", "bad");
+  return spent ? "Смазчик докупил смазку (−" + formatMoney(spent) + "). " : "";
+}
+
 function farmBuy(id) {
+  if (id === "worker") {
+    farmToggleWorker();
+    return;
+  }
   var F = state.farm,
     c = 0,
     t = 0;
@@ -97,7 +138,11 @@ function farmBuy(id) {
     return;
   }
   if (state.bal < c) {
-    toast("Не хватает денег", "Нужно " + formatMoney(c) + ", у вас " + formatMoney(state.bal), "bad");
+    toast(
+      "Не хватает денег",
+      "Нужно " + formatMoney(c) + ", у вас " + formatMoney(state.bal),
+      "bad",
+    );
     return;
   }
   state.bal -= c;
@@ -109,27 +154,72 @@ function farmBuy(id) {
   if (id === "rack") toast("🗄️ Стойка", "Куплена за " + formatMoney(c), "good");
   else if (id === "wc") toast("💧 Водяное охлаждение", "Установлено за " + formatMoney(c), "good");
   else if (id === "lube" || id === "cool")
-    toast(id === "lube" ? "🧴 Смазка" : "🧪 Охлаждающая жидкость", "+10 ед. за " + formatMoney(c), "good");
+    toast(
+      id === "lube" ? "🧴 Смазка" : "🧪 Охлаждающая жидкость",
+      "+10 ед. за " + formatMoney(c),
+      "good",
+    );
   else toast("🖥️ " + GPU_TYPES[t][0], "Куплена видеокарта за " + formatMoney(c), "good");
   render();
 }
 
+/** Одна попытка заточки карты. Возвращает "poor" (нет денег), "up", "same" или "down". */
+function tryGpuUpgrade(g) {
+  var cost = upCost(g),
+    chance = GPU_UPGRADE_CHANCE[g.l - 1];
+  if (state.bal < cost) return "poor";
+  state.bal -= cost;
+  if (Math.random() * 100 < chance) {
+    g.l++;
+    return "up";
+  }
+  if (g.l >= 6) {
+    g.l--;
+    return "down";
+  }
+  return "same";
+}
+
+/** Заточка одной карты (кнопка «Заточить»). */
 function gpuUpgrade(i) {
-  var g = state.farm.gpus[i],
-    c = upCost(g),
-    p = GPU_UPGRADE_CHANCE[g.l - 1];
-  if (state.bal < c) {
-    toast("Не хватает денег", "Заточка стоит " + formatMoney(c), "bad");
+  var g = state.farm.gpus[i];
+  if (!g || g.l >= 10) return; // карты нет или уровень уже максимальный
+  var name = GPU_TYPES[g.t][0],
+    cost = upCost(g),
+    r = tryGpuUpgrade(g);
+  if (r === "poor") {
+    toast("Не хватает денег", "Заточка стоит " + formatMoney(cost), "bad");
     return;
   }
-  state.bal -= c;
-  if (Math.random() * 100 < p) {
-    g.l++;
-    toast("✨ Заточка удалась", GPU_TYPES[g.t][0] + " теперь уровня " + g.l, "good");
-  } else if (g.l >= 6) {
-    g.l--;
-    toast("💥 Заточка провалилась", GPU_TYPES[g.t][0] + " упала до уровня " + g.l, "bad");
-  } else toast("Заточка не удалась", "Уровень остался прежним.", "bad");
+  if (r === "up") toast("✨ Заточка удалась", name + " теперь уровня " + g.l, "good");
+  else if (r === "down") toast("💥 Заточка провалилась", name + " упала до уровня " + g.l, "bad");
+  else toast("Заточка не удалась", "Уровень остался прежним.", "bad");
+  render();
+}
+
+/** Кнопка «Заточить все на +1»: по одной попытке на каждую карту, шансы и риски обычные. */
+function gpuUpgradeAll() {
+  var before = state.bal,
+    res = { up: 0, same: 0, down: 0, poor: 0 };
+  state.farm.gpus.forEach(function (g) {
+    if (g.l < 10) res[tryGpuUpgrade(g)]++;
+  });
+  var tried = res.up + res.same + res.down;
+  if (!tried) {
+    toast("Заточка", res.poor ? "Не хватает денег на заточку." : "Нечего точить.", "bad");
+    return;
+  }
+  var text =
+    "Удалось: " +
+    res.up +
+    ", не удалось: " +
+    res.same +
+    (res.down ? ", упали: " + res.down : "") +
+    (res.poor ? ", не хватило денег: " + res.poor : "") +
+    ". Потрачено " +
+    formatMoney(before - state.bal) +
+    ".";
+  toast("🔧 Заточка всех карт", text, res.up >= res.same + res.down ? "good" : "bad");
   render();
 }
 
@@ -137,7 +227,7 @@ function farmView() {
   var F = state.farm,
     free = F.racks * RACK_SLOTS - F.gpus.length;
   var v =
-    '<button class="learn" data-bs="home" style="margin:0 0 12px">← Все бизнесы</button><h1>Майнинг-ферма</h1><p class="sub">Покупайте стойки и видеокарты, следите за расходниками и электричеством. Доход фермы облагается налогом 13%.</p>';
+    '<h1>Майнинг-ферма</h1><p class="sub">Покупайте стойки и видеокарты, следите за расходниками и электричеством. Доход фермы облагается налогом 13%.</p>';
   v +=
     '<div class="panel"><div class="row"><span>Стойки</span><b>' +
     F.racks +
@@ -157,6 +247,9 @@ function farmView() {
     '<div class="row"><span>Смазка</span><b>' +
     F.lube.toFixed(1) +
     " ед.</b></div>" +
+    '<div class="row"><span>Смазчик</span><b>' +
+    (F.worker ? "нанят, " + formatMoney(FARM_WORKER_SALARY) + " / мес" : "не нанят") +
+    "</b></div>" +
     '<div class="row"><span>Охлаждающая жидкость</span><b>' +
     F.cool.toFixed(1) +
     " ед.</b></div>" +
@@ -175,6 +268,12 @@ function farmView() {
     '<button class="job" data-b="lube"><span class="n">Смазка ×10</span><span class="p">' +
     formatMoney(LUBE_PRICE * 10) +
     '</span><span class="t">Без неё доход −5 0%</span></button>'.replace("−5 0%", "−50%");
+  v +=
+    '<button class="job" data-b="worker"><span class="n">' +
+    (F.worker ? "Уволить смазчика" : "Нанять смазчика") +
+    '</span><span class="p">' +
+    formatMoney(FARM_WORKER_SALARY) +
+    ' / мес</span><span class="t">Сам докупает смазку за ваш счёт, когда она кончается. Зарплата идёт счётом вместе с остальными сотрудниками</span></button>';
   v +=
     '<button class="job" data-b="wc"><span class="n">Водяное охлаждение (на стойку)</span><span class="p">' +
     formatMoney(60000) +
@@ -205,6 +304,15 @@ function farmView() {
   if (!F.gpus.length)
     v += '<div class="panel"><p>Пока нет видеокарт. Купите стойку и карту.</p></div>';
   else {
+    var upAll = 0;
+    F.gpus.forEach(function (g) {
+      if (g.l < 10) upAll += upCost(g);
+    });
+    if (upAll)
+      v +=
+        '<div class="jobs" style="margin-bottom:10px"><button class="job" data-ua="1"><span class="n">Заточить все на +1</span><span class="p">' +
+        formatMoney(upAll) +
+        '</span><span class="t">По одной попытке на каждую карту, шансы и риск падения на уровнях 6+ обычные</span></button></div>';
     v += '<div class="panel">';
     F.gpus.forEach(function (g, i) {
       v +=
@@ -252,7 +360,11 @@ function gpuSalePrice(g) {
 
 function farmValue() {
   var F = state.farm,
-    s = F.racks * RACK_PRICE * 0.5 + (F.wc || 0) * 30000 + F.lube * LUBE_PRICE * 0.5 + F.cool * COOLANT_PRICE * 0.5;
+    s =
+      F.racks * RACK_PRICE * 0.5 +
+      (F.wc || 0) * 30000 +
+      F.lube * LUBE_PRICE * 0.5 +
+      F.cool * COOLANT_PRICE * 0.5;
   F.gpus.forEach(function (g) {
     s += gpuSalePrice(g);
   });
@@ -276,6 +388,7 @@ function farmSell(k) {
     F.gpus = [];
     F.lube = 0;
     F.cool = 0;
+    F.worker = 0;
     toast("💰 Ферма продана", formatMoney(v), "good");
   }
   render();
