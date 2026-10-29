@@ -45,7 +45,7 @@ function nextDay() {
   m += farmDay();
   m += medDay();
   m += businessDay();
-  m += agencyDay();
+  m += dividendDay();
   m += relDay();
   m += flipDay();
   m += restDay();
@@ -69,4 +69,19 @@ function nextDay() {
   ledgerEnd();
   log(m);
   render();
+}
+
+/** Минимальная пауза между нажатиями «Следующий день» (кнопка и клавиши), мс. */
+var NEXT_DAY_COOLDOWN_MS = 250,
+  lastNextDayAt = 0;
+
+/**
+ * «Следующий день» от пользователя: не чаще, чем раз в NEXT_DAY_COOLDOWN_MS.
+ * Защищает от случайных двойных нажатий и зажатой клавиши. Код и тесты вызывают nextDay() напрямую.
+ */
+function requestNextDay() {
+  var now = Date.now();
+  if (now - lastNextDayAt < NEXT_DAY_COOLDOWN_MS) return;
+  lastNextDayAt = now;
+  nextDay();
 }

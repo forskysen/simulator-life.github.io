@@ -80,16 +80,6 @@ function bankView() {
     '</b></div><div class="row"><span>Ваш баланс</span><b>' +
     formatMoney(state.bal) +
     '</b></div></div><div class="panel" style="margin-top:12px"><input id="bamt" type="number" min="0" inputmode="numeric" placeholder="Сумма" style="width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--ink);font:inherit;margin-bottom:10px"><div style="display:flex;flex-wrap:wrap;gap:8px"><button class="learn" data-k="dep">Положить</button><button class="learn" data-k="depall">Положить всё</button><button class="learn" data-k="wd">Снять</button><button class="learn" data-k="wdall">Снять всё</button></div></div>' +
-    taxPanel() +
-    '<h1 style="margin-top:24px">Благотворительность</h1><p class="sub">Каждое пожертвование снижает налог на 1%, каждое следующее в 10 раз дороже. Налог сейчас: ' +
-    Math.round(TAX_RATE * 100) +
-    '%.</p><div class="panel">' +
-    (state.char >= 8
-      ? "<p>Максимум: налог 5%.</p>"
-      : '<button class="learn" data-k="char">Пожертвовать ' +
-        formatMoney(1000000 * Math.pow(10, state.char)) +
-        " (налог −1%)</button>") +
-    "</div>" +
     bankUpView()
   );
 }
@@ -140,4 +130,77 @@ function bankUpgradeAction(k) {
   else state.bu.l++;
   toast("🏦 Улучшение вклада", "Установлено", "good");
   render();
+}
+
+/** Максимум пожертвований и цена следующего (каждое в 10 раз дороже). */
+var CHARITY_MAX = 8;
+
+function charityCost() {
+  return 1000000 * Math.pow(10, state.char);
+}
+
+/** Скидка на счета в процентах после n пожертвований. */
+function charityPercentAfter(n) {
+  return Math.round((1 - (BASE_TAX_RATE - 0.01 * n) / BASE_TAX_RATE) * 1000) / 10;
+}
+
+/**
+ * Пожертвование: налоговая ставка −1 п.п., а все счета, кроме зарплат сотрудников,
+ * дешевеют на ту же долю (см. charityFactor и CHARITY_FACTOR_BILLS в taxes.js).
+ */
+function charity() {
+  if (state.char >= CHARITY_MAX) return;
+  var c = charityCost();
+  if (state.bal < c) {
+    toast("Не хватает денег", "Нужно " + formatMoney(c), "bad");
+    return;
+  }
+  state.bal -= c;
+  state.char++;
+  TAX_RATE = BASE_TAX_RATE - 0.01 * state.char;
+  toast(
+    "🎗️ Благотворительность",
+    "Налог " +
+      Math.round(TAX_RATE * 100) +
+      "%, счета дешевле на " +
+      charityPercentAfter(state.char) +
+      "% (кроме зарплат сотрудников)",
+    "good",
+  );
+  render();
+}
+
+/** Экран вкладки «Благотворительность». */
+function charityView() {
+  var v =
+    '<h1>Благотворительность</h1><p class="sub">Каждое пожертвование снижает налоговую ставку на 1% и делает все счета дешевле: налоги, электричество фермы, аренда жилья и точек. Зарплаты сотрудников не снижаются. Каждое следующее пожертвование в 10 раз дороже.</p>';
+  v +=
+    '<div class="panel"><div class="row"><span>Пожертвований</span><b>' +
+    state.char +
+    " из " +
+    CHARITY_MAX +
+    '</b></div><div class="row"><span>Налоговая ставка</span><b>' +
+    Math.round(TAX_RATE * 100) +
+    '%</b></div><div class="row"><span>Скидка на счета</span><b>−' +
+    charityPercentAfter(state.char) +
+    "%</b></div>";
+  if (state.char >= CHARITY_MAX) v += "<p>Максимум: налог " + Math.round(TAX_RATE * 100) + "%.</p>";
+  else
+    v +=
+      '<button class="learn" data-k="char" style="margin-top:8px">Пожертвовать ' +
+      formatMoney(charityCost()) +
+      " (налог −1%, счета −" +
+      charityPercentAfter(state.char + 1) +
+      "%)</button>";
+  v += '</div><h1 style="margin-top:24px">На что влияет</h1><div class="panel">';
+  for (var k in BILL_NAMES) {
+    var d = charityDiscountPercent(k);
+    v +=
+      '<div class="row"><span>' +
+      BILL_NAMES[k] +
+      "</span><b>" +
+      (d ? "−" + d + "%" : "не снижается") +
+      "</b></div>";
+  }
+  return v + "</div>";
 }

@@ -68,22 +68,6 @@ var BUSINESSES = [
     "Авария ракеты",
   ],
   [
-    "🏬 Торговый центр",
-    8000000,
-    "Арендаторы, парковка, реклама. Открывайте сколько угодно, но каждый следующий дороже (×1,35).",
-    "Открыть торговый центр",
-    12000000,
-    90000,
-    1200000,
-    0,
-    [
-      ["Парковка", 15000000, 0.15, "+15% к доходу"],
-      ["Кинотеатр", 25000000, 0.2, "+20% к доходу"],
-      ["Фуд-корт", 20000000, 0.15, "+15% к доходу"],
-    ],
-    "Ограбление и пожар",
-  ],
-  [
     "💻 IT-компания",
     1500000,
     "Разработка приложений и сервисов. Нужен диплом программиста (Образование).",
@@ -98,22 +82,6 @@ var BUSINESSES = [
       ["Собственный продукт", 2500000, 0.3, "+30% к доходу"],
     ],
     "Утечка данных",
-  ],
-  [
-    "📣 Рекламное агентство",
-    3000000,
-    "Подписывайте контракты, вечно улучшайте агентство и заключайте договоры с государством.",
-    "—",
-    2000000,
-    0,
-    0,
-    0,
-    [
-      ["Креативная студия", 3000000, 0.1, "+10% к доходу"],
-      ["Медиабаза", 5000000, 0.15, "+15% к доходу"],
-      ["Связи в госорганах", 8000000, 0.2, "+20% к доходу"],
-    ],
-    "Скандал вокруг кампании",
   ],
   // --- добавлено в 1.1.2 (индексы 7-11; на экране список сортируется по заработку) ---
   [
@@ -200,13 +168,9 @@ var BUSINESSES = [
 
 /**
  * Порядок бизнесов на экране: по чистому заработку одной точки в месяц
- * (доход минус расходы точки минус зарплата сотрудника). У агентства нет точек,
- * для него взято примерное значение. Индексы в сохранениях при этом не меняются.
+ * (доход минус расходы точки минус зарплата сотрудника). Индексы в сохранениях при этом не меняются.
  */
-var AGENCY_SORT_VALUE = 2000000;
-
 function businessSortValue(i) {
-  if (i === 6) return AGENCY_SORT_VALUE;
   var b = BUSINESSES[i];
   return b[5] * 30 - b[6] - EMPLOYEE_SALARY[i];
 }
@@ -220,13 +184,14 @@ function businessOrder() {
 }
 
 function businessIncome(i) {
+  if (propertySuspended()) return 0;
   var s = state.B[i],
     m = 1;
   BUSINESSES[i][8].forEach(function (u, j) {
     if (s.up[j]) m += u[2];
   });
   if (s.u2[0]) m += 0.1;
-  var u = i === 6 ? agencyBase() : Math.min(s.n, s.emp) * BUSINESSES[i][5];
+  var u = Math.min(s.n, s.emp) * BUSINESSES[i][5];
   return (
     u *
     m *
@@ -242,7 +207,7 @@ function businessDay() {
   var t = 0,
     o = "";
   state.B.forEach(function (s, i) {
-    if (!s.own || (!s.n && i !== 6)) return;
+    if (!s.own || !s.n) return;
     var inc = businessIncome(i);
     state.bal += inc;
     state.mInc += inc;
@@ -291,14 +256,8 @@ function businessAction(id) {
     }
     c = pointPrice(i);
   } else if (k === "E") {
-    if ((i !== 6 && s.emp >= s.n) || (i === 6 && s.emp >= 12)) {
-      toast(
-        "Сотрудники",
-        i === 6
-          ? "Максимум 12 сотрудников."
-          : "Сотрудников не больше, чем точек. Сначала откройте точку.",
-        "bad",
-      );
+    if (s.emp >= s.n) {
+      toast("Сотрудники", "Сотрудников не больше, чем точек. Сначала откройте точку.", "bad");
       return;
     }
     c = EMPLOYEE_SALARY[i];
@@ -369,7 +328,6 @@ function businessHub() {
 }
 
 function businessView(i) {
-  if (i === 6 && state.B[6].own) return agencyView();
   var b = BUSINESSES[i],
     s = state.B[i],
     v =
@@ -459,18 +417,17 @@ function businessMaxPoints(i) {
 function totalBusinessIncome() {
   var t = farmInc();
   state.B.forEach(function (s, i) {
-    if (s.own && (s.n || i === 6)) t += businessIncome(i);
+    if (s.own && s.n) t += businessIncome(i);
   });
   return t;
 }
 
-var EMPLOYEE_SALARY = [
-    25000, 80000, 250000, 600000, 180000, 70000, 150000, 25000, 200000, 450000, 800000, 400000,
-  ],
+var EMPLOYEE_SALARY = [25000, 80000, 250000, 600000, 70000, 25000, 200000, 450000, 800000, 400000],
   // бизнес -> курс (индекс профессии), без диплома лицензию не продают
-  BUSINESS_DIPLOMA = { 5: 12, 8: 7, 9: 19, 10: 18, 11: 15 },
-  POINT_PRICE_GROWTH = { 4: 1.35 },
-  UNLIMITED_POINTS = { 4: 1 };
+  BUSINESS_DIPLOMA = { 4: 12, 6: 7, 7: 19, 8: 18, 9: 15 },
+  // у бизнесов нет роста цены точки и безлимитных точек (механизм оставлен для будущих бизнесов)
+  POINT_PRICE_GROWTH = {},
+  UNLIMITED_POINTS = {};
 
 function pointPrice(i) {
   return Math.round(BUSINESSES[i][4] * Math.pow(POINT_PRICE_GROWTH[i] || 1, state.B[i].n));

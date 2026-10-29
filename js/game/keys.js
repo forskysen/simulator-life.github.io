@@ -1,6 +1,6 @@
 /**
  * Горячие клавиши.
- *   Пробел / Enter ... следующий день
+ *   Пробел / Enter ... следующий день (не чаще раза в 250 мс)
  *   ← →            ... соседняя вкладка внутри раздела
  *   Shift + ← →    ... соседний раздел
  *
@@ -22,6 +22,6 @@ function onGameKey(e) {
   } else if (e.key === " " || e.key === "Enter") {
     if (tag === "BUTTON" || tag === "A") return;
     e.preventDefault();
-    nextDay();
+    requestNextDay();
   }
 }

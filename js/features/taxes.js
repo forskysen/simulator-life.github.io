@@ -2,10 +2,22 @@
  * Счета и налоги: начисление, пени, последствия, автоплатёж, конец месяца.
  */
 
-function taxPanel() {
+/** Скидка благотворительности на счёт k в процентах (0 для зарплат сотрудников). */
+function charityDiscountPercent(k) {
+  return k === "sal" ? 0 : Math.round((1 - charityFactor()) * 1000) / 10;
+}
+
+/** Экран вкладки «Счета»: просрочка, автоплатёж, список счетов и ожидаемые платежи. */
+function billsView() {
   var left = 30 - (state.day % 30),
+    disc = Math.round((1 - charityFactor()) * 1000) / 10,
     v =
-      '<h1 style="margin-top:24px">Счета и налоги</h1><p class="sub">Всё регулярное собрано здесь: налоги, электричество фермы, зарплаты, аренда. Счета начисляются раз в месяц, платить нужно самому или подключить автоплатёж. Каждый день неуплаты пени +0,5%. Через 7 дней без оплаты: свет отключают, сотрудники уходят, из съёмного жилья выселяют. Через 30 дней приходят амбалы.</p>';
+      '<h1>Счета и налоги</h1><p class="sub">Всё регулярное собрано здесь: налоги, электричество фермы, зарплаты, аренда. Счета начисляются раз в месяц, платить нужно самому или подключить автоплатёж. Каждый день неуплаты пени +0,5%. Если любой счёт не оплачен ' +
+      ARREARS_DAYS +
+      " дней, бизнесы, ферма и машины перестают работать и не приносят доход. Ничего не отбирают: после оплаты всё возвращается.</p>";
+  if (propertySuspended())
+    v +=
+      '<div class="panel" style="border-left:6px solid var(--bad);margin-bottom:12px"><p><b>⛔ Имущество остановлено.</b> Оплатите просроченные счета ниже, и бизнесы, ферма и машины заработают снова.</p></div>';
   v +=
     '<div class="panel"><div class="row"><span>🤖 Автоплатёж за всё</span><b>' +
     (state.ap.own ? "подключён" : formatMoney(APCOST)) +
@@ -38,7 +50,7 @@ function taxPanel() {
     v +=
       '<div class="row" style="flex-wrap:wrap"><span>' +
       BILL_NAMES[k] +
-      (t.a > 0 ? " · " + t.d + " дн." : "") +
+      (t.a > 0 ? " · " + t.d + " дн." + (t.d >= ARREARS_DAYS ? " ⛔" : "") : "") +
       "</span><b>" +
       formatMoney(t.a) +
       "</b>" +
@@ -56,20 +68,24 @@ function taxPanel() {
   v +=
     '<div class="panel" style="margin-top:12px"><div class="row"><span>Ставка налога</span><b>' +
     Math.round(TAX_RATE * 100) +
-    '%</b></div><div class="row"><span>Ожидается в следующем счёте: зарплата и бизнес (налог)</span><b>' +
+    "%" +
+    (disc ? " (благотворительность −" + disc + "%)" : "") +
+    '</b></div><div class="row"><span>Ожидается в следующем счёте: зарплата и бизнес (налог)</span><b>' +
     formatMoney(state.mJob * TAX_RATE + Math.max(0, state.mInc - state.mJob) * TAX_RATE) +
     '</b></div><div class="row"><span>Электричество фермы</span><b>' +
-    formatMoney(farmBill()) +
+    formatMoney(farmBill() * charityFactor()) +
     '</b></div><div class="row"><span>Зарплаты сотрудников</span><b>' +
     formatMoney(estimatedSalaries()) +
     '</b></div><div class="row"><span>Аренда точек и жилья</span><b>' +
-    formatMoney(estimatedOperatingCosts() + Math.round(HOMES[state.house][1] * state.infl)) +
+    formatMoney(
+      (estimatedOperatingCosts() + Math.round(HOMES[state.house][1] * state.infl)) *
+        charityFactor(),
+    ) +
     '</b></div><div class="row"><span>До начисления</span><b>' +
     left +
     " дн.</b></div></div>";
   return v;
 }
-
 var BILL_NAMES = {
   job: "Налог с зарплаты",
   biz: "Налог с бизнесов",
@@ -82,14 +98,26 @@ var BILL_NAMES = {
   rent: "Аренда жилья",
 };
 
+/**
+ * Счета, которые дешевеют от благотворительности вместе со ставкой налога (все, кроме зарплат сотрудников).
+ * Налоги с зарплаты, бизнеса и продаж уже считаются по сниженной ставке TAX_RATE, остальные
+ * (недвижимость, транспорт, электричество, аренда) умножаются на charityFactor() при начислении.
+ */
+var CHARITY_FACTOR_BILLS = { prop: 1, veh: 1, elec: 1, opx: 1, rent: 1 };
+
+/** Во сколько раз благотворительность удешевила счета: 1 без пожертвований, 0,385 на максимуме. */
+function charityFactor() {
+  return TAX_RATE / BASE_TAX_RATE;
+}
+
 function addTax(k, a) {
+  if (CHARITY_FACTOR_BILLS[k]) a *= charityFactor();
   a = Math.round(a);
   if (!(a > 0)) return;
   var t = state.tx[k] || (state.tx[k] = { a: 0, d: 0 });
   if (t.a <= 0) t.d = 0;
   t.a += a;
 }
-
 function taxTotal() {
   var s = 0;
   for (var k in state.tx) s += state.tx[k].a;
@@ -111,6 +139,7 @@ function payTax(k) {
       state.tx[j].d = 0;
     }
     toast("🧾 Все налоги оплачены", formatMoney(tot), "good");
+    syncSuspension();
     render();
     return;
   }
@@ -128,6 +157,7 @@ function payTax(k) {
   toast("🧾 " + BILL_NAMES[k], "Оплачено " + formatMoney(a), "good");
   if (k === "elec" && state.farm.gpus.length)
     toast("💡 Свет включён", "Ферма снова работает.", "good");
+  syncSuspension();
   render();
 }
 
@@ -152,127 +182,15 @@ function taxDay() {
     if (t.a > 0) {
       t.d++;
       t.a = Math.round(t.a * 1.005);
-      if (t.d === 7 && k === "elec" && state.farm.gpus.length)
+      if (t.d === ARREARS_DAYS && k === "elec" && state.farm.gpus.length)
         toast("🔌 Отключение света", "Электричество не оплачено 7 дней: ферма остановлена", "bad");
-      if (t.d === 7 && k === "sal") {
-        var q = state.astro + (state.farm.worker || 0);
-        state.astro = 0;
-        state.farm.worker = 0;
-        state.B.forEach(function (s) {
-          q += s.emp;
-          s.emp = 0;
-        });
-        if (q > 0)
-          toast(
-            "🚪 Сотрудники ушли",
-            "Зарплаты не выплачены неделю: уволились " +
-              q +
-              " чел. Точки без сотрудников не работают",
-            "bad",
-          );
-      }
-      if (t.d === 7 && k === "rent" && (state.house === 1 || state.house === 2)) {
-        var hn = HOMES[state.house][0];
-        moveTo(0);
-        toast("🏚️ Вас выселили", "Аренда (" + hn + ") не оплачена 7 дней", "bad");
-      }
       if (t.d === 15)
         toast("⚠️ Счёт не оплачен", BILL_NAMES[k] + ": пени растут на 0,5% в день", "bad");
-      if (t.d === 25)
-        toast(
-          "🚨 Скоро придут приставы",
-          "Через 5 дней: " + BILL_NAMES[k] + " всё ещё не оплачен",
-          "bad",
-        );
     }
   }
   o += autoPay();
-  var en = false;
-  for (k in state.tx) if (state.tx[k].a > 0 && state.tx[k].d >= 30) en = true;
-  if (en) o += enforce();
+  syncSuspension();
   return o;
-}
-
-function enforce() {
-  var T = taxTotal(),
-    got = 0,
-    why = [],
-    i,
-    k,
-    t;
-  var c = Math.max(0, state.bal) * 0.5;
-  if (c > 0) {
-    state.bal -= c;
-    got += c;
-    why.push("наличные " + formatMoney(c));
-  }
-  if (got < T && state.dep > 0) {
-    var d = state.dep * 0.3;
-    state.dep -= d;
-    got += d;
-    why.push("часть вклада " + formatMoney(d));
-  }
-  if (got < T && state.re.own.length) {
-    var s = 0;
-    state.re.own.forEach(function (p) {
-      s += flipHouseValue(p) * 0.6;
-    });
-    state.re.own = [];
-    got += s;
-    why.push("дома на перепродажу " + formatMoney(s));
-  }
-  if (got < T) {
-    Object.keys(state.hm)
-      .map(Number)
-      .sort(function (a, b) {
-        return a - b;
-      })
-      .forEach(function (n) {
-        if (got < T && n !== state.house) {
-          got += homePrice(n) * 0.6;
-          why.push("дом: " + HOMES[n][0]);
-          delete state.hm[n];
-        }
-      });
-    if (got < T && state.hm[state.house] !== undefined) {
-      got += homePrice(state.house) * 0.6;
-      why.push("ваш дом: " + HOMES[state.house][0]);
-      delete state.hm[state.house];
-      moveTo(0);
-    }
-  }
-  if (got < T) {
-    for (i in state.cars) {
-      if (got < T) {
-        got += CARS[+i][1] * 0.5;
-        why.push("машина: " + CARS[+i][0]);
-        delete state.cars[i];
-      }
-    }
-  }
-  var pay = Math.min(got, T),
-    rest = T - pay;
-  state.bal += got - pay;
-  state.taxPaid = (state.taxPaid || 0) + pay;
-  for (k in state.tx) {
-    t = state.tx[k];
-    if (t.a > 0) {
-      t.a = T > 0 ? Math.round((t.a * rest) / T) : 0;
-      t.d = 0;
-    }
-  }
-  state.mood = clampPercent(state.mood - 20);
-  toast(
-    "💪 Пришли амбалы",
-    "Забрали: " +
-      why.join(", ") +
-      ". Долг погашен на " +
-      formatMoney(pay) +
-      (rest > 0 ? ", остаток " + formatMoney(rest) : "") +
-      ".",
-    "bad",
-  );
-  return "Пришли амбалы за налоги. ";
 }
 
 function monthEnd() {
@@ -291,21 +209,59 @@ function monthEnd() {
   o += farmMonth();
   toast(
     "🧾 Конец месяца",
-    "Начислены счета и налоги" + (state.ap.own ? "." : ": оплатите их в «Банке»."),
+    "Начислены счета и налоги" + (state.ap.own ? "." : ": оплатите их во вкладке «Счета»."),
     "",
   );
   o += autoPay();
   return (
     " Конец месяца: начислены счета и налоги" +
-    (state.ap.own ? "" : " (оплатить в «Банке»)") +
+    (state.ap.own ? "" : " (оплатить во вкладке «Счета»)") +
     ". " +
     o
   );
 }
 
+/** Через сколько дней просрочки любого счёта имущество перестаёт работать. */
+var ARREARS_DAYS = 7,
+  suspensionIgnored = false;
+
+/**
+ * Есть ли счёт, не оплаченный ARREARS_DAYS дней и дольше. Пока да, бизнесы, ферма и машины не приносят доход.
+ * Ничего не отбирается: как только долги оплачены, всё работает снова.
+ */
+function propertySuspended() {
+  if (suspensionIgnored) return false;
+  for (var k in state.tx) if (state.tx[k].a > 0 && state.tx[k].d >= ARREARS_DAYS) return true;
+  return false;
+}
+
+/** Доход бизнесов и фермы без учёта остановки: на нём держатся оценка компании и расчёты. */
+function fundamentalIncome() {
+  suspensionIgnored = true;
+  var t = totalBusinessIncome();
+  suspensionIgnored = false;
+  return t;
+}
+
+/** Сообщает игроку, когда имущество остановилось или снова заработало. */
+function syncSuspension() {
+  var now = propertySuspended();
+  if (now === !!state.suspended) return;
+  state.suspended = now ? 1 : 0;
+  if (now)
+    toast(
+      "⛔ Имущество остановлено",
+      "Счёт не оплачен " +
+        ARREARS_DAYS +
+        "+ дней: бизнесы, ферма и машины не приносят доход. Оплатите счета, и всё заработает снова.",
+      "bad",
+    );
+  else toast("✅ Имущество снова работает", "Долги оплачены.", "good");
+}
+
 function blackout() {
   var t = state.tx.elec;
-  return t.a > 0 && t.d >= 7;
+  return !!t && t.a > 0 && t.d >= 7;
 }
 
 var AUTOPAY_ORDER = ["elec", "sal", "rent", "opx", "prop", "veh", "job", "biz", "gain"],
@@ -343,6 +299,7 @@ function autoPay() {
   });
   if (paid > 0) {
     toast("🤖 Автоплатёж", "Списано " + formatMoney(paid), "good");
+    syncSuspension();
     return "Автоплатёж: " + formatMoney(paid) + ". ";
   }
   return "";

@@ -192,20 +192,6 @@ function relView() {
   return v + "</div>";
 }
 
-function charity() {
-  if (state.char >= 8) return;
-  var c = 1000000 * Math.pow(10, state.char);
-  if (state.bal < c) {
-    toast("Не хватает денег", "Нужно " + formatMoney(c), "bad");
-    return;
-  }
-  state.bal -= c;
-  state.char++;
-  TAX_RATE = 0.13 - 0.01 * state.char;
-  toast("🎗️ Благотворительность", "Налог снижен до " + Math.round(TAX_RATE * 100) + "%", "good");
-  render();
-}
-
 function relBonus() {
   var P = state.rel;
   return P && !P.m && P.love >= 60 ? (P.wed ? 0.1 : 0.05) : 0;

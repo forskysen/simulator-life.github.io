@@ -28,7 +28,7 @@ function upCost(g) {
 
 function farmInc() {
   var F = state.farm;
-  if (blackout() || !F.gpus.length) return 0;
+  if (blackout() || propertySuspended() || !F.gpus.length) return 0;
   var s = 0;
   F.gpus.forEach(function (g) {
     s += gpuInc(g);
@@ -51,6 +51,7 @@ function farmDay() {
     n = F.gpus.length;
   if (!n) return "";
   if (blackout()) return "Свет на ферме отключён за неуплату. ";
+  if (propertySuspended()) return "Ферма остановлена: долг по счетам. ";
   var note = autoLube();
   var inc = farmInc();
   F.lube = Math.max(0, F.lube - n * 0.05);
@@ -254,7 +255,7 @@ function farmView() {
     F.cool.toFixed(1) +
     " ед.</b></div>" +
     (blackout()
-      ? '<div class="row"><span>Свет</span><b>Отключён за неуплату. Оплатите счёт в «Банке»</b></div>'
+      ? '<div class="row"><span>Свет</span><b>Отключён за неуплату. Оплатите счёт во вкладке «Счета»</b></div>'
       : "") +
     "</div>";
   v += '<h1 style="margin-top:24px">Покупки</h1><div class="jobs">';
@@ -265,27 +266,13 @@ function farmView() {
     RACK_SLOTS +
     " слота для видеокарт, максимум 10</span></button>";
   v +=
-    '<button class="job" data-b="lube"><span class="n">Смазка ×10</span><span class="p">' +
-    formatMoney(LUBE_PRICE * 10) +
-    '</span><span class="t">Без неё доход −5 0%</span></button>'.replace("−5 0%", "−50%");
-  v +=
-    '<button class="job" data-b="worker"><span class="n">' +
-    (F.worker ? "Уволить смазчика" : "Нанять смазчика") +
-    '</span><span class="p">' +
-    formatMoney(FARM_WORKER_SALARY) +
-    ' / мес</span><span class="t">Сам докупает смазку за ваш счёт, когда она кончается. Зарплата идёт счётом вместе с остальными сотрудниками</span></button>';
-  v +=
-    '<button class="job" data-b="wc"><span class="n">Водяное охлаждение (на стойку)</span><span class="p">' +
-    formatMoney(60000) +
-    '</span><span class="t">Стойка с водяным охлаждением не требует охлаждающей жидкости. Сейчас: ' +
-    (F.wc || 0) +
-    " из " +
-    F.racks +
-    "</span></button>";
-  v +=
     '<button class="job" data-b="cool"><span class="n">Охлаждающая жидкость ×10</span><span class="p">' +
     formatMoney(COOLANT_PRICE * 10) +
     '</span><span class="t">Без неё доход −30% и риск пожара ×10</span></button>';
+  v +=
+    '<button class="job" data-b="lube"><span class="n">Смазка ×10</span><span class="p">' +
+    formatMoney(LUBE_PRICE * 10) +
+    '</span><span class="t">Без неё доход −50%</span></button>';
   GPU_TYPES.forEach(function (t, i) {
     v +=
       '<button class="job" data-b="g' +
@@ -300,6 +287,21 @@ function farmView() {
       formatMoney(t[3]) +
       "/мес</span></button>";
   });
+  v += '</div><h1 style="margin-top:24px">Особые улучшения</h1><div class="jobs">';
+  v +=
+    '<button class="job" data-b="worker"><span class="n">' +
+    (F.worker ? "Уволить смазчика" : "Нанять смазчика") +
+    '</span><span class="p">' +
+    formatMoney(FARM_WORKER_SALARY) +
+    ' / мес</span><span class="t">Сам докупает смазку за ваш счёт, когда она кончается. Зарплата идёт счётом вместе с остальными сотрудниками</span></button>';
+  v +=
+    '<button class="job" data-b="wc"><span class="n">Водяное охлаждение (на стойку)</span><span class="p">' +
+    formatMoney(60000) +
+    '</span><span class="t">Стойка с водяным охлаждением не требует охлаждающей жидкости. Сейчас: ' +
+    (F.wc || 0) +
+    " из " +
+    F.racks +
+    "</span></button>";
   v += '</div><h1 style="margin-top:24px">Видеокарты</h1>';
   if (!F.gpus.length)
     v += '<div class="panel"><p>Пока нет видеокарт. Купите стойку и карту.</p></div>';

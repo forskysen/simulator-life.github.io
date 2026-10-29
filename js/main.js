@@ -4,7 +4,7 @@
 
 document.addEventListener("click", onGameClick);
 document.addEventListener("keydown", onGameKey);
-document.getElementById("next").onclick = nextDay;
+document.getElementById("next").onclick = requestNextDay;
 document.getElementById("log").onclick = function () {
   this.classList.toggle("open");
 };

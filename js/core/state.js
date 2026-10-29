@@ -2,7 +2,9 @@
  * Состояние игры (объект S), сохранение/загрузка, миграция старых сохранений, настройки (CFG).
  */
 
-var TAX_RATE = 0.13;
+/** Налоговая ставка без благотворительности; TAX_RATE = базовая − 1% за каждое пожертвование. */
+var BASE_TAX_RATE = 0.13,
+  TAX_RATE = BASE_TAX_RATE;
 
 var state = {
   day: 1,
@@ -21,6 +23,7 @@ var state = {
   dep: 0,
   teeth: 100,
   implant: 0,
+  suspended: 0,
   shield: 0,
   banned: {},
   bs: "home",
@@ -39,7 +42,7 @@ var state = {
   astro: 0,
   bu: { r: 0, l: 0 },
   tech: { d: [0, 0, 0, 0, 0], cur: -1, left: 0 },
-  mk: { p: [], h: [], q: [], c: [], own: null },
+  mk: { p: [], h: [], q: [], c: [], own: null, fair: 0, growth: 0, flows: [] },
   ms: -1,
   psy: -99,
   taxPaid: 0,
@@ -53,7 +56,7 @@ var state = {
 
 /** Сохранения версии 1: в HOMES вставлены 2 дома (индексы 3 и 4), остальные покупные сдвинулись на 2. */
 function migrateHomes() {
-  if (state.saveVer >= 2) return;
+  if (state.saveVer >= 2 || !state.hm) return; // совсем старые сохранения (без hm) чинит блок в fixS
   var shift = function (i) {
     return i >= 3 ? i + 2 : i;
   };
@@ -64,7 +67,83 @@ function migrateHomes() {
   state.saveVer = 2;
 }
 
+/**
+ * Версия 3: убраны «Торговый центр» (был индекс 4) и «Рекламное агентство» (индекс 6).
+ * Остальные бизнесы сдвигаются вниз по номерам, а вложения в убранные возвращаются деньгами:
+ * лицензия, точки, улучшения, расширения, наём сотрудников и уровни агентства.
+ */
+var LEGACY_BUSINESS_COUNT = 12, // сколько бизнесов было до версии 3
+  REMOVED_BUSINESSES = [
+    // i: старый индекс; point: цена точки; growth: рост цены каждой следующей; hire: цена найма
+    {
+      i: 4,
+      name: "Торговый центр",
+      license: 8000000,
+      point: 12000000,
+      growth: 1.35,
+      hire: 180000,
+      upgrades: [15000000, 25000000, 20000000],
+    },
+    {
+      i: 6,
+      name: "Рекламное агентство",
+      license: 3000000,
+      point: 2000000,
+      growth: 1,
+      hire: 150000,
+      upgrades: [3000000, 5000000, 8000000],
+    },
+  ];
+
+function migrateBusinesses() {
+  if (state.saveVer >= 3) return;
+  while (state.B.length < LEGACY_BUSINESS_COUNT)
+    state.B.push({ own: 0, n: 0, up: [0, 0, 0], x: 0 });
+  var refund = 0,
+    removed = REMOVED_BUSINESSES.map(function (r) {
+      return r.i;
+    });
+  REMOVED_BUSINESSES.forEach(function (r) {
+    var s = state.B[r.i];
+    if (!s || !s.own) return;
+    var sum = r.license;
+    for (var k = 0; k < (s.n || 0); k++) sum += Math.round(r.point * Math.pow(r.growth, k));
+    (s.up || []).forEach(function (u, j) {
+      if (u) sum += r.upgrades[j];
+    });
+    (s.u2 || []).forEach(function (u, j) {
+      if (u) sum += Math.round(r.point * SHARED_UPGRADES[j][1]);
+    });
+    for (var x = 0; x < (s.x || 0); x++) sum += r.point * 3 * (x + 1);
+    sum += (s.emp || 0) * r.hire;
+    if (r.i === 6 && state.ag)
+      for (var l = 0; l < (state.ag.lvl || 0); l++) sum += Math.round(1000000 * Math.pow(1.35, l));
+    refund += sum;
+  });
+  var newIndex = {},
+    n = 0;
+  for (var i = 0; i < LEGACY_BUSINESS_COUNT; i++) if (removed.indexOf(i) < 0) newIndex[i] = n++;
+  state.B = state.B.filter(function (b, i) {
+    return removed.indexOf(i) < 0;
+  });
+  delete state.ag;
+  if (typeof state.bs === "number")
+    state.bs = newIndex[state.bs] === undefined ? "home" : newIndex[state.bs];
+  if (refund > 0) {
+    state.bal += refund;
+    toast(
+      "🏢 Бизнесы закрыты",
+      "Торговый центр и Рекламное агентство убраны из игры. Возврат вложений: " +
+        formatMoney(refund),
+      "good",
+    );
+  }
+  state.saveVer = 3;
+}
+
 function fixS() {
+  migrateHomes();
+  migrateBusinesses();
   if (!state.navLast) state.navLast = {};
   if (!state.hist) state.hist = { days: [], months: [] };
   if (!state.histRange && state.histRange !== 0) state.histRange = 30;
@@ -76,6 +155,7 @@ function fixS() {
     if (!s.u2) s.u2 = [0, 0, 0];
   });
   if (state.implant === undefined) state.implant = 0;
+  if (state.suspended === undefined) state.suspended = 0;
   if (state.farm.wc === undefined) state.farm.wc = 0;
   if (state.farm.worker === undefined) state.farm.worker = 0;
   if (!state.eco) state.eco = { ph: 0, left: 90 };
@@ -86,7 +166,6 @@ function fixS() {
   }
   if (!state.re) state.re = { mkt: [], own: [], au: [], mult: 1, day: 0 };
   if (!state.re.mkt.length) state.re.mkt = [flipNewHouse(), flipNewHouse(), flipNewHouse()];
-  if (!state.ag) state.ag = { lvl: 0, ct: [] };
   if (!state.tx)
     state.tx = {
       job: { a: 0, d: 0 },
@@ -113,7 +192,6 @@ function fixS() {
     if (state.house >= 3) state.hm[state.house] = homePrice(state.house);
     state.saveVer = SAVE_VERSION;
   }
-  migrateHomes();
   for (var k in state.banned) if (state.banned[k] === true) state.banned[k] = state.day;
 }
 
@@ -142,8 +220,12 @@ function applyCfg() {
 
 var SAVE_KEY = "lifesim_v01";
 
-/** Версия формата сохранения: 2 = список жилья расширен (индексы домов 3+ сдвинуты на 2). */
-var SAVE_VERSION = 2;
+/**
+ * Версия формата сохранения.
+ *   2 = список жилья расширен (индексы домов 3+ сдвинуты на 2)
+ *   3 = убраны бизнесы «Торговый центр» и «Рекламное агентство» (индексы бизнесов сдвинуты)
+ */
+var SAVE_VERSION = 3;
 
 function save() {
   try {

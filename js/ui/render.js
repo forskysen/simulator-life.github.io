@@ -11,6 +11,8 @@ var TAB_VIEWS = {
   Дома: homesView,
   Машины: carView,
   Банк: bankView,
+  Счета: billsView,
+  Благотворительность: charityView,
   Биржа: marketView,
   Бизнес: businessesView,
   Ферма: farmView,
@@ -59,7 +61,7 @@ function profile() {
 function render() {
   var y = window.pageYOffset;
   state.life = autoLifestyle();
-  TAX_RATE = 0.13 - 0.01 * state.char;
+  TAX_RATE = BASE_TAX_RATE - 0.01 * state.char;
   DEPOSIT_LIMIT = depMax();
   DEPOSIT_RATE = 0.04 + 0.005 * state.bu.r;
   normalizeTab();

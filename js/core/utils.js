@@ -69,23 +69,33 @@ function formatMoney(n) {
   return Math.round(n).toLocaleString("ru-RU") + " ₽";
 }
 
+/**
+ * Короткая запись денег: к = тысяча, кк = миллион, ккк = миллиард, кккк = триллион,
+ * ккккк = квадриллион, кккккк = квинтиллион (10^18). До 10 000 показываем число целиком.
+ */
+var MONEY_UNITS = [
+  // [с какой суммы, делитель, подпись]
+  [1e18, 1e18, "кккккк"],
+  [1e15, 1e15, "ккккк"],
+  [1e12, 1e12, "кккк"],
+  [1e9, 1e9, "ккк"],
+  [1e6, 1e6, "кк"],
+  [1e4, 1e3, "к"],
+];
+
 function formatMoneyShort(n) {
   var a = Math.abs(n),
-    s = n < 0 ? "−" : "",
-    u = [
-      [1e9, 1e9, "ккк"],
-      [1e6, 1e6, "кк"],
-      [1e4, 1e3, "к"],
-    ];
-  for (var i = 0; i < 3; i++) {
-    if (a >= u[i][0]) {
+    s = n < 0 ? "−" : "";
+  for (var i = 0; i < MONEY_UNITS.length; i++) {
+    if (a >= MONEY_UNITS[i][0]) {
       var k = i;
-      if (i > 0 && Math.round(a / u[i][1]) >= 1000) k = i - 1;
-      var v = a / u[k][1];
+      // 999 999 кк округляется до 1000кк: переходим на следующую единицу
+      if (i > 0 && Math.round(a / MONEY_UNITS[i][1]) >= 1000) k = i - 1;
+      var v = a / MONEY_UNITS[k][1];
       return (
         s +
         (v < 100 ? (Math.round(v * 10) / 10 + "").replace(".", ",") : Math.round(v)) +
-        u[k][2] +
+        MONEY_UNITS[k][2] +
         " ₽"
       );
     }

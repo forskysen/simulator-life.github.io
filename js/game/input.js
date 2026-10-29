@@ -88,12 +88,6 @@ var CLICK_ACTIONS = [
     },
   ], // перекуп домов
   [
-    "ag",
-    function (v) {
-      agencyAction(v);
-    },
-  ], // агентство
-  [
     "rest",
     function () {
       startRest();

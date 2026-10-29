@@ -28,6 +28,7 @@ function carOrder() {
 }
 
 function carBonus() {
+  if (propertySuspended()) return 0;
   var b = 0;
   for (var i in state.cars) b = Math.max(b, CARS[+i][2]);
   return b;
